@@ -2,104 +2,210 @@
 
 window.onload = function()
 {
-	var array = [4, 12, 43, 59, 2, 81, 29, 38, 92, 51, 21];	
-	var m = new Mergifier(array);
+	var m = new Mergifier();
 	m.start();
 }
 
-function Mergifier(array)
-{
-	this.array = this.splitArray(array);
-	console.log(this.array);
+function Mergifier()
+{	
+	this.delay = 200;
+
+	var maxNumber = 100, minNumber = 0, quantity = 20;
+	var array = RandomGenerator.generate(maxNumber, minNumber, quantity, false);
+	
+	var prefix = "mergesort";
+	this.animator = new SortDotAnimator_mergesort(prefix, quantity);
+	this.animator.build(array);
+	this.animator.hideArrow();
+	
+	this.array = this.splitArray(this.animator.array, array);
 }
+
+Mergifier.prototype = new SortAnimatable();
+Mergifier.prototype.constructor = Mergifier;
 
 Mergifier.prototype.start = function()
 {
-	this.mergesort();	
+	var args = 
+	{
+		cycle: 1,
+		counter: 0,
+		start: 0,
+		toMerge: 0,
+		i: 0,
+		array: this.array,
+		length: this.array.length,
+		
+		left: null,
+		right: null,
+		result: null,
+		counter_compare: null,
+		
+		concat_array: null
+	};
+	
+	this.mergify(args);
 }
 
-Mergifier.prototype.splitArray = function(array)
+Mergifier.prototype.splitArray = function(dots, array)
 {
 	var size = array.length;
 	var newArray = new Array();
-	var currentArray;
+	var currentArray, object;
 	for(var i = 0; i<size; i++)
 	{
+		object = {
+				dot: dots[i],
+				value: array[i]
+			}
 		currentArray = new Array();
+		currentArray.push(object);
 		newArray.push(currentArray);	
 	}
-	
 	return newArray;
 }
 
-Mergifier.prototype.mergesort = function()
+Mergifier.prototype.mergify = function(args)
+{	
+	this.startTimeout(this.mergesort, args);
+}
+
+Mergifier.prototype.mergesort = function(args)
 {
-	var cycle = 1;
-	var counter = 0;
-	var start = 0;
-	var array = this.array;
-	var length = array.length;
-	
-	var toMerge, next;
-	
-	for(var i = 0; i <length; i++)
+	if(args.i++ <= args.length)
 	{
-		toMerge = start + 1;
-		next = toMerge + 1;
+		var start = args.start;
+		var array = args.array;
 		
-		if(array[toMerge])
+		args.toMerge = start + 1;
+		args.next = args.toMerge + 1;
+		
+		if(array[args.toMerge])
 		{
-			array[counter++] = this.merge(array, start, toMerge);
 			
-			if(next >= (length/cycle) - 1) 
-			{
-				array[counter] = array[next];
-				next = 0;
-				counter = 0;
-				cycle++;
-			}
+			this.startTimeout(this.merge, args);
+			
 		}
 		else 
 		{
-			array[counter] = array[start];
-			next = 0;
-			counter = 0;
-			cycle++;
+			console.log("Break Point 1");
+			array[args.counter] = array[args.start];
+			array[args.start] = null;
+			args.next = 0;
+			args.counter = 0;
+			args.cycle++;
+			args.start = args.next;
+			this.startTimeout(this.mergesort, args);
 		}
 		
-		
-		
-		start = next;
 	}
+	else
+	{
+		console.log("Complete!");
+		console.log(this.getAllValues(args.array));
+	}
+	
 		
 }
 
-Mergifier.prototype.merge = function(array, start, toMerge)
+Mergifier.prototype.merge = function(args)
 {
+	var start = args.start;
+	var toMerge = args.toMerge;
 	
-	var left = array[start];
-	var right = array[toMerge];
+	args.left = args.array[start];
+	args.right = args.array[toMerge];
 	
-	array[start] = null;
-	array[toMerge] = null;
+	this.animator.setDotActive(args.left, args.right);
+	
+	args.array[start] = null;
+	args.array[toMerge] = null;
 	
 	var l, r;
-	var result = new Array();
+	args.result = new Array();
+	args.counter_compare = 0;
 	
-	while(left.length >0 && right.length >0)
+	this.startTimeout(this.compare, args);
+}
+
+Mergifier.prototype.compare = function(args)
+{
+	var start = args.start;
+	
+	l = args.left[0].value;
+	r = args.right[0].value;
+	
+	var toPull = (l >= r) ? args.left[0] : args.right[0];
+	this.animator.pullOut(toPull, start, args.counter_compare++, args.cycle);
+	
+	if(l >= r)
+		args.result.push(args.left.shift());
+	else args.result.push(args.right.shift());
+	
+	if(args.left.length >0 && args.right.length >0)
+		this.startTimeout(this.compare, args);
+	else
+		this.startTimeout(this.checkConcat, args);
+}
+
+Mergifier.prototype.checkConcat = function(args)
+{
+	var start = args.start;
+	
+	if(args.left.length + args.right.length > 0)
 	{
-		l = left[0];
-		r = right[0];
-		
-		if(l >= r)
-			result.push(left.shift());
-		else result.push(right.shift());
+		if(args.left.length > 0)
+			args.concat_array = args.left
+		else if(args.right.length > 0)
+			args.concat_array = args.right
+			
+		this.startTimeout(this.concatRemains, args);
+	}
+	else 
+		this.startTimeout(this.updateArray, args);
+}
+
+Mergifier.prototype.concatRemains = function(args)
+{
+	var length = args.concat_array.length;
+	var start = args.start;
+	start += args.counter;
+	for(var i = 0; i<length; i++)
+	{
+		var toPull = args.concat_array[i];
+		this.animator.pullOut(toPull, args.start, args.counter_compare+i, args.cycle);
 	}
 	
-	if(left.length > 0)
-		result = result.concat(left);
-	else if(right.length > 0)
-		result = result.concat(right);
-		
-	return result;
+	args.result = args.result.concat(args.concat_array);
+	this.startTimeout(this.updateArray, args);
+}
+
+Mergifier.prototype.updateArray = function(args)
+{
+	this.animator.pushIn(args.result);
+	this.animator.setDotInactive();
+	
+	args.array[args.counter++] = args.result;
+
+	if(args.next >= (args.length/args.cycle) - 1) 
+	{
+		args.array[args.counter] = args.array[args.next];
+		args.next = 0;
+		args.counter = 0;
+		args.cycle++;
+	}	
+	
+	args.start = args.next
+	this.startTimeout(this.mergesort, args);
+}
+
+Mergifier.prototype.getAllValues = function(array)
+{
+	var length = array[0].length;
+	var toReturn = new Array();
+	for(var i = 0; i < length; i++)
+	{
+		toReturn.push(array[0][i].value);
+	}
+	return toReturn;
 }
